@@ -22,6 +22,18 @@ SPEC_WEIGHTS = {
     "layout": 2, "connection_type": 2, "sensor_model": 2, "driver_size": 2,
     "aviator_connector": 2, "material": 2, "profile": 2,
 }
+HARD_CONSTRAINTS = {
+    "gaming_mouse": {"connection_type", "sensor_model", "polling_rate"},
+    "mechanical_keyboard": {"layout", "connection_type", "hot_swappable", "language_layout"},
+    "gaming_headset": {"connection_type", "platform_support"},
+    "custom_cable": {"connector_a", "connector_b", "aviator_connector"},
+    "custom_keycap": {"material", "manufacturing_method", "profile", "layout"},
+}
+MARKET_CODES = {
+    "Germany": "EU", "France": "EU", "Poland": "EU", "Netherlands": "EU",
+    "Spain": "EU", "Italy": "EU", "United Kingdom": "UK", "United States": "US",
+    "Japan": "JP",
+}
 
 
 def _tokens(value: Any) -> set[str]:
@@ -58,6 +70,7 @@ def _candidate(product: dict[str, Any], inquiry: InquiryData) -> ProductCandidat
     total_weight = sum(SPEC_WEIGHTS.get(key, 1) for key in requested_specs)
     reasons: list[str] = []
     gaps: list[str] = []
+    hard_constraint_gaps: list[str] = []
     for key, requested in requested_specs.items():
         actual_key = SPEC_ALIASES.get(key, key)
         actual = product["specs"].get(actual_key)
@@ -65,7 +78,10 @@ def _candidate(product: dict[str, Any], inquiry: InquiryData) -> ProductCandidat
             matched_weight += SPEC_WEIGHTS.get(key, 1)
             reasons.append(f"{key.replace('_', ' ').title()} matches: {requested}.")
         else:
-            gaps.append(f"Requested {key.replace('_', ' ')} '{requested}' is not confirmed by this SKU.")
+            gap = f"Requested {key.replace('_', ' ')} '{requested}' is not confirmed by this SKU."
+            gaps.append(gap)
+            if key in HARD_CONSTRAINTS.get(inquiry.purchase_request.category, set()):
+                hard_constraint_gaps.append(gap)
     spec_score = round((matched_weight / total_weight) * 80) if total_weight else 40
     quantity = inquiry.purchase_request.quantity
     if quantity is not None and quantity >= product["standard_moq"]:
@@ -85,8 +101,7 @@ def _candidate(product: dict[str, Any], inquiry: InquiryData) -> ProductCandidat
         gaps.append("One or more requested certifications require confirmation.")
     target = inquiry.purchase_request.target_market
     if target:
-        market_codes = {"Germany": "EU", "France": "EU", "Poland": "EU", "United Kingdom": "UK", "United States": "US", "Japan": "JP"}
-        if market_codes.get(target, target) in product["supported_markets"]:
+        if MARKET_CODES.get(target, target) in product["supported_markets"]:
             spec_score += 5
             reasons.append("Target market is supported by the catalog entry.")
         else:
@@ -98,6 +113,7 @@ def _candidate(product: dict[str, Any], inquiry: InquiryData) -> ProductCandidat
         match_score=max(0, min(100, spec_score)), standard_moq=product["standard_moq"],
         mass_production_lead_time_days=product["mass_production_lead_time_days"],
         certifications=product["certifications"], reasons=reasons, gaps=gaps,
+        hard_constraint_gaps=hard_constraint_gaps,
         specs=product["specs"],
     )
 
@@ -118,7 +134,11 @@ def match_product_catalog(inquiry: InquiryData, db_path: Path | None = None) -> 
             gaps=["No category-specific product specifications were provided."],
         )
     product_map = {product["sku"]: product for product in products}
-    ranked = sorted((_candidate(product, inquiry) for product in products), key=lambda item: item.match_score, reverse=True)
+    ranked = sorted(
+        (_candidate(product, inquiry) for product in products),
+        key=lambda item: (not item.hard_constraint_gaps, item.match_score),
+        reverse=True,
+    )
     if deep_requested:
         odm_candidates = [candidate for candidate in ranked if product_map[candidate.sku]["odm_supported"]]
         if odm_candidates:
@@ -128,21 +148,14 @@ def match_product_catalog(inquiry: InquiryData, db_path: Path | None = None) -> 
     best_product = product_map[best.sku]
     light_requested = [field for field in LIGHT_CUSTOMIZATION if getattr(custom, field)]
     unsupported_light = [field for field in light_requested if not best_product[LIGHT_CUSTOMIZATION[field]]]
-    language_gap = custom.language_layout and "language_layout" in inquiry.product_requirements and any(
-        "language layout" in gap.lower() for gap in best.gaps
-    )
-    if best.match_score < 45:
-        match_type = "ODM Feasibility Review" if best_product["odm_supported"] and (deep_requested or light_requested) else "No Suitable Match"
-    elif deep_requested or unsupported_light or language_gap:
+    if best.hard_constraint_gaps or deep_requested or unsupported_light:
+        match_type = "ODM Feasibility Review" if best_product["odm_supported"] else "No Suitable Match"
+    elif best.match_score < 60:
         match_type = "ODM Feasibility Review" if best_product["odm_supported"] else "No Suitable Match"
     elif light_requested:
         match_type = "Standard SKU + Light Customization"
-    elif best.match_score >= 75:
-        match_type = "Standard SKU Match"
-    elif best_product["odm_supported"]:
-        match_type = "ODM Feasibility Review"
     else:
-        match_type = "No Suitable Match"
+        match_type = "Standard SKU Match"
     reasons = list(best.reasons)
     if light_requested and match_type == "Standard SKU + Light Customization":
         reasons.append(f"Catalog supports light customization: {', '.join(light_requested)}.")

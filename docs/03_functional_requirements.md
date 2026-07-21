@@ -13,6 +13,9 @@
 | FR-09 | Generate a guarded English draft | Deterministic template or optional LLM |
 | FR-10 | Save and filter CRM records | SQLite CRM writer and UI |
 | FR-11 | Evaluate 25 labeled cases | Evaluation service and page |
+| FR-12 | Expose analysis, product, and CRM capabilities through REST | FastAPI with five endpoints |
+| FR-13 | Separate quality, commercial, and risk signals | Parser and customer checker |
+| FR-14 | Prevent standard matching when a hard constraint conflicts | Product matcher |
 
 ## Non-functional Requirements
 
@@ -22,4 +25,4 @@
 - Secrets must remain outside version control.
 - The UI must stay usable on desktop and mobile widths supported by Streamlit.
 - The system must not make final commercial or compliance commitments.
-
+- Customer country, target market, and delivery destination must remain separate fields.

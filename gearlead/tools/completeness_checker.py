@@ -37,9 +37,12 @@ def check_missing_fields(inquiry: InquiryData) -> tuple[list[str], int]:
     ]
     for field in CATEGORY_FIELDS.get(inquiry.purchase_request.category, []):
         value = inquiry.product_requirements.get(field)
-        required.append((field, value if value is not False else False))
-    missing = [LABELS.get(field, field.replace("_", " ").title()) for field, value in required if value in (None, "", False)]
+        required.append((field, value))
+    missing = [
+        LABELS.get(field, field.replace("_", " ").title())
+        for field, value in required
+        if value is None or value == ""
+    ]
     completed = len(required) - len(missing)
     score = round((completed / len(required)) * 100) if required else 0
     return missing, score
-

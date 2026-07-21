@@ -18,6 +18,8 @@ COUNTRIES = {
     "mexico": "Mexico", "hong kong": "Hong Kong", "singapore": "Singapore",
 }
 
+COUNTRY_PATTERN = "|".join(sorted((re.escape(key) for key in COUNTRIES), key=len, reverse=True))
+
 CORPORATE_SUFFIXES = r"(?:GmbH|Ltd\.?|LLC|Inc\.?|Co\.?|S\.A\.?|Sp\. z o\.o\.|B\.V\.)"
 
 
@@ -30,6 +32,50 @@ def _first_match(pattern: str, text: str, flags: int = re.IGNORECASE) -> str:
     if not match:
         return ""
     return next((group.strip() for group in match.groups() if group is not None), "")
+
+
+def _normalize_country(value: str) -> str:
+    return COUNTRIES.get(value.strip().lower(), "")
+
+
+def _first_country(text: str) -> str:
+    match = re.search(rf"\b({COUNTRY_PATTERN})\b", text, re.IGNORECASE)
+    return _normalize_country(match.group(1)) if match else ""
+
+
+def _customer_country(text: str) -> str:
+    patterns = [
+        rf"(?:based|located|headquartered)\s+in\s+(?:the\s+)?({COUNTRY_PATTERN})\b",
+        rf"(?:company|brand|distributor|retailer|buyer)\s+in\s+(?:the\s+)?({COUNTRY_PATTERN})\b",
+        rf"(?:we are|we're)\s+(?:from\s+)?(?:a|an)?\s*({COUNTRY_PATTERN})\b",
+    ]
+    for pattern in patterns:
+        value = _first_match(pattern, text)
+        if value:
+            return _normalize_country(value)
+    return _first_country(text)
+
+
+def _target_market(text: str) -> str:
+    patterns = [
+        rf"(?:target|sales|distribution)\s+market\s+(?:is\s+|in\s+|for\s+)?(?:the\s+)?({COUNTRY_PATTERN})\b",
+        rf"(?:sold|selling|distributed)\s+in\s+(?:the\s+)?({COUNTRY_PATTERN})\b",
+        rf"for\s+(?:our\s+|the\s+)?({COUNTRY_PATTERN})\s+(?:market|stores|customers|retail)\b",
+        rf"for\s+(?:our\s+|the\s+)?({COUNTRY_PATTERN})\b",
+    ]
+    for pattern in patterns:
+        value = _first_match(pattern, text)
+        if value:
+            return _normalize_country(value)
+    return ""
+
+
+def _delivery_destination(text: str) -> str:
+    value = _first_match(
+        r"(?:deliver(?:y)?|ship(?:ping)?)\s+to\s+([^,.;]+?)(?=\s+(?:by|before|on)\s+|[,.;]|$)",
+        text,
+    )
+    return value.strip() if value else ""
 
 
 def _extract_company(text: str) -> str:
@@ -128,7 +174,10 @@ def _extract_specs(text: str, category: str) -> dict[str, object]:
         layout = _first_match(r"\b(60%|65%|75%|TKL|full[- ]?size)(?=\s|[,.;])", text)
         if layout: specs["layout"] = layout.replace("full size", "Full-size").replace("full-size", "Full-size")
         if _contains(text, "gasket"): specs["mounting_structure"] = "Gasket"
-        if _contains(text, "hot-swappable", "hot swappable", "hotswap"): specs["hot_swappable"] = True
+        if _contains(text, "not hot-swappable", "not hot swappable", "non-hot-swappable", "without hot-swap"):
+            specs["hot_swappable"] = False
+        elif _contains(text, "hot-swappable", "hot swappable", "hotswap"):
+            specs["hot_swappable"] = True
         if _contains(text, "pbt"): specs["keycap_material"] = "PBT"
         if _contains(text, "abs keycap"): specs["keycap_material"] = "ABS"
         profile = _first_match(r"\b(Cherry|OEM|XDA|MDA|SA)\s+profile", text)
@@ -191,7 +240,10 @@ def rule_based_extract(text: str) -> InquiryData:
     website_match = re.search(r"(?:https?://|www\.)[\w.-]+\.[A-Za-z]{2,}(?:/\S*)?", clean)
     email = email_match.group(0) if email_match else ""
     website = website_match.group(0).rstrip(".,;") if website_match else ""
-    country = next((value for key, value in COUNTRIES.items() if re.search(rf"\b{re.escape(key)}\b", lower)), "")
+    country = _customer_country(clean)
+    explicit_target_market = _target_market(clean)
+    target_market = explicit_target_market or country
+    delivery_destination = _delivery_destination(clean)
     customer_type = next((value for value in ["distributor", "brand", "retailer", "ecommerce", "trading", "wholesaler"] if value in lower), "unknown")
     certifications = [value for value in ["CE", "FCC", "RoHS", "UKCA"] if re.search(rf"\b{value}\b", clean, re.IGNORECASE)]
     target_price_match = re.search(r"(?:target price|below|under)\s*(?:USD|US\$|\$)?\s*(\d+(?:\.\d+)?)", clean, re.IGNORECASE)
@@ -200,6 +252,8 @@ def rule_based_extract(text: str) -> InquiryData:
         r"(?:deliver(?:y|ed)?|arrive|needed|launch(?: date)?)\s+(?:is\s+|by\s+|before\s+)?([^.,;]+)|(?:for\s+(?:an?\s+)?)?([^.,;]+?)\s+launch\b",
         clean,
     )
+    quality_warnings = []
+    commercial_warnings = []
     risk_signals = []
     if _contains(lower, "western union", "crypto payment", "personal account"):
         risk_signals.append("Unusual payment method requested.")
@@ -208,11 +262,13 @@ def rule_based_extract(text: str) -> InquiryData:
     if _contains(lower, "without contract", "bypass contract", "outside the platform"):
         risk_signals.append("Buyer asks to bypass the formal contracting process.")
     if _contains(lower, "exclusive", "exclusivity") and not _contains(lower, "channel", "stores", "distribution network"):
-        risk_signals.append("Exclusivity requested without channel information.")
+        commercial_warnings.append("Exclusivity requested without channel information.")
     if _contains(lower, "cheapest", "lowest price", "best price") and not _extract_company(clean) and len(_extract_specs(clean, category)) <= 1:
-        risk_signals.append("Price-only inquiry provides minimal buyer and product context.")
+        quality_warnings.append("Price-only inquiry provides minimal buyer and product context.")
     if len(clean) < 35:
-        risk_signals.append("Inquiry content is unusually short.")
+        quality_warnings.append("Inquiry content is unusually short.")
+    if target_market and not explicit_target_market:
+        commercial_warnings.append("Target market is inferred from the customer country and should be confirmed.")
     quantity = _extract_quantity(clean)
     customization = {
         "logo": _contains(lower, "custom logo", "private label", "our logo"),
@@ -232,7 +288,7 @@ def rule_based_extract(text: str) -> InquiryData:
             "category": category, "quantity": quantity,
             "annual_quantity": _extract_annual_quantity(clean), "target_price": target_price,
             "currency": "USD" if target_price is not None or _contains(lower, "usd", "$") else "",
-            "target_market": country, "delivery_destination": country,
+            "target_market": target_market, "delivery_destination": delivery_destination,
             "required_delivery_date": delivery, "sample_required": _contains(lower, "sample", "prototype"),
         },
         "product_requirements": _extract_specs(clean, category),
@@ -244,6 +300,8 @@ def rule_based_extract(text: str) -> InquiryData:
             "payment_terms_requested": _contains(lower, "payment terms", "net 30", "net 60"),
             "exclusivity_requested": _contains(lower, "exclusive", "exclusivity"),
         },
+        "quality_warnings": quality_warnings,
+        "commercial_warnings": commercial_warnings,
         "risk_signals": risk_signals,
     }
     return model_validate_compat(InquiryData, data)

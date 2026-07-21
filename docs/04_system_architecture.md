@@ -3,6 +3,8 @@
 ```mermaid
 flowchart TD
     UI[Streamlit] --> WF[Workflow]
+    Client[Postman / curl] --> REST[FastAPI]
+    REST --> WF
     WF --> EX[Extractor]
     WF --> CC[Completeness and customer checks]
     WF --> PM[Product matcher]
@@ -19,7 +21,7 @@ flowchart TD
 
 ## Key Decision
 
-This is a modular monolith. For a portfolio POC, a separate API server, message queue, vector database, and multi-agent runtime would add operational work without improving the core business proof.
+This is a modular monolith. Streamlit and FastAPI are two thin entry points over the same workflow. For a portfolio POC, message queues, a vector database, and a multi-agent runtime would add operational work without improving the core business proof.
 
 ## Reliability Pattern
 
@@ -28,4 +30,3 @@ The optional LLM path falls back to deterministic parsing or drafting on API, ti
 ## Production Evolution
 
 A production version would place authentication and API boundaries around the workflow, use managed data stores, add observability, version prompts and rules, encrypt PII, and require an approval audit trail.
-

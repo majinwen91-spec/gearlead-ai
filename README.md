@@ -24,16 +24,19 @@ GearLead AI models the bounded workflow from **inquiry received** to **first res
 
 - Paste an English inquiry or upload TXT/DOCX
 - Extract buyer, purchase, technical, customization, and commercial fields
+- Keep customer country, target market, and delivery destination separate
 - Validate structured output with Pydantic
 - Find missing qualification information
-- Check explicit risk signals and simulated CRM history
+- Separate information-quality notes, commercial warnings, and explicit risks
 - Return the top three products from a 20-SKU SQLite catalog
+- Block standard-SKU decisions when a product hard constraint conflicts
 - Classify Standard SKU, Light Customization, ODM Review, or No Match
 - Calculate a six-dimension, 100-point lead score
 - Route to High, Medium, Low, or Risk Review
 - Generate a strategy-specific English reply with a mandatory review notice
 - Save reviewed results to a local CRM table
 - Run a case-level evaluation against 25 manually labeled synthetic inquiries
+- Expose analysis, product, and CRM capabilities through five FastAPI endpoints
 
 ## Demo Screens
 
@@ -48,7 +51,9 @@ GearLead AI models the bounded workflow from **inquiry received** to **first res
 ```mermaid
 flowchart LR
     U[Export Salesperson] --> UI[Streamlit UI]
+    C[Postman / curl] --> REST[FastAPI]
     UI --> W[Workflow Orchestrator]
+    REST --> W
     W --> P[Inquiry Parser]
     W --> C[Completeness + Customer Check]
     W --> M[Catalog Matcher]
@@ -99,7 +104,7 @@ flowchart TD
 
 ## Product Matching
 
-The matcher queries only products in the detected category, weights category-defining fields, checks MOQ, certifications, markets, and customization support, then returns the top three candidates with positive evidence and gaps.
+The matcher queries only products in the detected category, checks explicitly requested specifications, MOQ, certifications, markets, and customization support, then returns the top three candidates with positive evidence and gaps. Category-specific hard constraints are checked before a standard match can be returned.
 
 The decision types are:
 
@@ -132,7 +137,7 @@ Current deterministic baseline:
 
 | Metric | Result | PRD target |
 |---|---:|---:|
-| Field extraction accuracy | 97.3% | >= 80% |
+| Basic field extraction accuracy | 98.7% | >= 80% |
 | Product match accuracy | 100.0% | >= 80% |
 | Priority classification accuracy | 100.0% | >= 75% |
 | Missing field recall | 97.4% | >= 80% |
@@ -145,6 +150,7 @@ These numbers describe a small, curated synthetic POC set. They are not claims a
 
 - Python 3.10+
 - Streamlit
+- FastAPI and Uvicorn
 - SQLite
 - Pydantic
 - Pandas
@@ -157,6 +163,7 @@ These numbers describe a small, curated synthetic POC set. They are not claims a
 ```text
 gearlead-ai/
 ├── app.py
+├── api.py
 ├── assets/
 ├── data/
 ├── docs/
@@ -180,6 +187,21 @@ cp .env.example .env
 streamlit run app.py
 ```
 
+Start the API in another terminal:
+
+```bash
+source .venv/bin/activate
+uvicorn api:app --reload
+```
+
+Open `http://127.0.0.1:8000/docs` for Swagger. The API provides:
+
+- `GET /health`
+- `POST /api/v1/inquiries/analyze`
+- `GET /api/v1/products`
+- `POST /api/v1/leads`
+- `GET /api/v1/leads`
+
 The default `.env.example` uses `DEMO_MODE=true`. No API key is required for the complete deterministic workflow.
 
 To enable an OpenAI-compatible provider:
@@ -199,7 +221,7 @@ Never commit `.env` or an API key.
 pytest
 ```
 
-The suite covers schema validation, all five product categories, sparse inquiries, risk overrides, score caps, workflow completion, reply safeguards, CRM persistence, and evaluation thresholds.
+The suite covers schema validation, all five product categories, separate geography fields, hard constraints, negative requirements, quality-versus-risk routing, score caps, workflow completion, CRM persistence, FastAPI endpoints, and evaluation thresholds.
 
 ## Demo Flow
 
@@ -234,6 +256,9 @@ GearLead AI does not:
 - [Testing plan](docs/09_testing_plan.md)
 - [Deployment](docs/10_deployment.md)
 - [Interview training guide, Chinese](docs/11_interview_training_guide_zh.md)
+- [Customer discovery, Chinese](docs/12_customer_discovery_zh.md)
+- [AI solution proposal, Chinese](docs/13_solution_proposal_zh.md)
+- [POC report, Chinese](docs/14_poc_report_zh.md)
 
 ## Roadmap
 
@@ -246,4 +271,4 @@ GearLead AI does not:
 
 ## Resume Bullet
 
-> Developed GearLead AI, an agent-based B2B inquiry qualification and product matching system for a simulated gaming peripherals exporter. The system extracts structured requirements from English inquiries, matches five product categories against a 20-SKU SQLite catalog, scores lead priority with explainable business rules, and generates human-reviewed follow-up strategies and English response drafts. Built a 25-case labeled POC evaluation set covering standard, incomplete, ODM, low-quality, and risk scenarios.
+> Developed GearLead AI, an agent-based B2B inquiry qualification and product matching system for a simulated gaming peripherals exporter. The system extracts structured requirements from English inquiries, applies category-specific hard constraints against a 20-SKU SQLite catalog, separates qualification warnings from commercial risks, and generates human-reviewed follow-up strategies and English response drafts. Exposed the workflow through five FastAPI endpoints and built a 25-case labeled POC regression set.

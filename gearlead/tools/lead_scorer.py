@@ -7,7 +7,7 @@ def calculate_lead_score(inquiry: InquiryData, customer: CustomerCheck, match: P
     explanations = list(customer.explanations)
     clarity = 0
     if inquiry.purchase_request.category != "unknown": clarity += 4
-    spec_count = len([value for value in inquiry.product_requirements.values() if value not in (None, "", False)])
+    spec_count = len([value for value in inquiry.product_requirements.values() if value not in (None, "")])
     clarity += min(6, spec_count * 2)
     if inquiry.purchase_request.quantity is not None: clarity += 4
     if inquiry.customization.requested_items() or inquiry.commercial_requirements.quotation_requested: clarity += 3

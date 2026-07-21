@@ -63,12 +63,16 @@ class InquiryData(BaseModel):
     product_requirements: dict[str, Any] = Field(default_factory=dict)
     customization: CustomizationRequirements = Field(default_factory=CustomizationRequirements)
     commercial_requirements: CommercialRequirements = Field(default_factory=CommercialRequirements)
+    quality_warnings: list[str] = Field(default_factory=list)
+    commercial_warnings: list[str] = Field(default_factory=list)
     risk_signals: list[str] = Field(default_factory=list)
 
 
 class CustomerCheck(BaseModel):
     score: int = Field(ge=0, le=20)
     risk_level: Literal["low", "medium", "high"] = "low"
+    quality_warnings: list[str] = Field(default_factory=list)
+    commercial_warnings: list[str] = Field(default_factory=list)
     risk_flags: list[str] = Field(default_factory=list)
     manual_review_required: bool = False
     matched_customer_id: str | None = None
@@ -85,6 +89,7 @@ class ProductCandidate(BaseModel):
     certifications: list[str] = Field(default_factory=list)
     reasons: list[str] = Field(default_factory=list)
     gaps: list[str] = Field(default_factory=list)
+    hard_constraint_gaps: list[str] = Field(default_factory=list)
     specs: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -158,4 +163,3 @@ def model_validate_compat(model_class: type[BaseModel], data: Any) -> BaseModel:
     if hasattr(model_class, "model_validate"):
         return model_class.model_validate(data)
     return model_class.parse_obj(data)
-

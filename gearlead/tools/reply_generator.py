@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from gearlead.llm_client import LLMClient, LLMError
@@ -7,6 +8,18 @@ from gearlead.schemas import FollowUpPlan, InquiryData, LeadScore, ProductMatch
 
 
 DISCLAIMER = "Draft for salesperson review."
+FORBIDDEN_COMMITMENTS = [
+    r"(?:delivery|lead time).{0,24}(?:is|are)?\s*(?:guaranteed|confirmed)",
+    r"(?:guarantee|confirm).{0,24}(?:delivery|lead time)",
+    r"(?:final|confirmed)\s+(?:unit\s+)?price",
+    r"(?:price|unit price).{0,20}(?:is confirmed|is final)",
+    r"(?:certification|approval).{0,24}(?:is|are)?\s*(?:guaranteed|confirmed)",
+    r"(?:credit|payment)\s+terms.{0,20}(?:approved|confirmed)",
+]
+
+
+def _contains_forbidden_commitment(reply: str) -> bool:
+    return any(re.search(pattern, reply, re.IGNORECASE) for pattern in FORBIDDEN_COMMITMENTS)
 
 
 def _deterministic_reply(inquiry: InquiryData, match: ProductMatch, plan: FollowUpPlan) -> str:
@@ -69,10 +82,8 @@ def generate_reply_draft(
         reply = llm.chat(prompt, context).strip()
         if DISCLAIMER.lower() not in reply.lower():
             reply += f"\n\n{DISCLAIMER}"
-        forbidden = ("guarantee delivery", "final price is", "we guarantee certification")
-        if any(term in reply.lower() for term in forbidden):
+        if _contains_forbidden_commitment(reply):
             return fallback
         return reply
     except LLMError:
         return fallback
-
