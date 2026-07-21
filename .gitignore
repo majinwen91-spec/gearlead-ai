@@ -10,4 +10,4 @@ gearlead.db
 *.db-journal
 .streamlit/secrets.toml
 .DS_Store
-
+docs/11_interview_training_guide_zh.md
