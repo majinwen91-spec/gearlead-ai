@@ -1,0 +1,13 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+gearlead.db
+*.db-journal
+.streamlit/secrets.toml
+.DS_Store
+
