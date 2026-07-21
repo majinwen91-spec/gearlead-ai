@@ -1,0 +1,10 @@
+customer_id,company_name,country,email_domain,customer_type,website,historical_inquiries,historical_orders,risk_status,notes
+C001,Nordlicht Gaming GmbH,Germany,nordlicht-gaming.de,distributor,https://nordlicht-gaming.de,4,2,normal,Established EU distributor
+C002,Apex Forge LLC,United States,apexforge.com,brand,https://apexforge.com,6,3,normal,Private-label gaming brand
+C003,PixelRaid Ltd,United Kingdom,pixelraid.co.uk,retailer,https://pixelraid.co.uk,2,1,normal,Online and retail channels
+C004,NeonFox Store,France,neonfox.fr,ecommerce,https://neonfox.fr,1,0,normal,Small ecommerce buyer
+C005,Mirai Input Co.,Japan,mirai-input.jp,brand,https://mirai-input.jp,3,1,normal,Keyboard enthusiast brand
+C006,Unknown Mega Trading,United States,gmail.com,unknown,,1,0,watchlist,Large claims without verifiable company profile
+C007,Vector Play Sp. z o.o.,Poland,vectorplay.pl,distributor,https://vectorplay.pl,5,2,normal,Central Europe distributor
+C008,Rapid Source Ltd,Hong Kong,rapidsource-mail.com,trading,https://rapidsource.example,2,0,risky,Requested non-standard payment route
+
