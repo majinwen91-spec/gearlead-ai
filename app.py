@@ -429,7 +429,7 @@ elif page == "POC评估":
 
 elif page == "项目说明":
     st.title("关于GearLead AI")
-    st.write("这是一个模拟电竞外设出口业务员和销售工程师首轮询盘处理流程的作品集POC。")
+    st.write("这是一个面向电竞外设出口首轮询盘处理的AI决策支持原型。")
     image_path = PROJECT_ROOT / "assets" / "gearlead_catalog.png"
     if image_path.exists():
         st.image(str(image_path), width="stretch")

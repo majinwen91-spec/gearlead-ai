@@ -6,7 +6,7 @@ GearLead AI is an agent-based B2B inquiry qualification and product matching POC
 
 ![Gaming peripheral catalog](assets/gearlead_catalog.png)
 
-> This is a portfolio demo for AI solution design. It does not provide legal, financial, trade compliance, or credit risk advice. All generated replies are drafts for salesperson review.
+> This proof of concept supports AI-assisted inquiry qualification and product matching. It does not provide legal, financial, trade compliance, or credit risk advice. All generated replies are drafts for salesperson review.
 
 ## Why This Project Exists
 
@@ -255,7 +255,6 @@ GearLead AI does not:
 - [Scoring and matching](docs/08_scoring_and_matching.md)
 - [Testing plan](docs/09_testing_plan.md)
 - [Deployment](docs/10_deployment.md)
-- [Interview training guide, Chinese](docs/11_interview_training_guide_zh.md)
 - [Customer discovery, Chinese](docs/12_customer_discovery_zh.md)
 - [AI solution proposal, Chinese](docs/13_solution_proposal_zh.md)
 - [POC report, Chinese](docs/14_poc_report_zh.md)
